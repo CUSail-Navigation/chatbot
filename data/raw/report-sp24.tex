@@ -1,0 +1,342 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{bibunits}
+
+% Set page size and margins
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=1.5cm,right=1.5cm,marginparwidth=1.5cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{multicol}
+\def\changemargin#1#2{\list{}{\rightmargin#2\leftmargin#1}\item[]}
+\let\endchangemargin=\endlist 
+\usepackage{stfloats} 
+
+%Setting up Section Font and Size
+\usepackage{titlesec}
+\usepackage[font=footnotesize,labelfont=bf]{caption}
+\titleformat{\section}    
+       {\normalfont\fontsize{18}{19}\sffamily\bfseries}
+       {\thesection}
+       {1em}
+       {}
+\titleformat{\subsection}    
+       {\normalfont\fontsize{11}{19}\slshape\bfseries}
+       {\thesubsection}
+       {1em}
+       {}
+\titleformat{\subsubsection}    
+       {\normalfont\fontsize{11}{19}\slshape\bfseries}
+       {\thesubsubsection}
+       {1em}
+       {}
+%Setting up Section Spacing 
+\titlespacing\section{0pt}{10pt plus 4pt minus 2pt}{10pt plus 2pt minus 2pt}
+\titlespacing\subsection{0pt}{12pt plus 4pt minus 2pt}{0pt plus 2pt minus 2pt}
+\titlespacing\subsubsection{0pt}{5pt plus 4pt minus 2pt}{0pt plus 2pt minus 2pt}
+
+%Headers
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhead[L]{Cornell Autonomous Sailboat Team}
+\fancyhead[R]{Navigation Team     
+    \includegraphics[width=0.30in]{Photos/LOGO_BLACK.png}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%_____________Title + Authors___________________________________
+
+%Title 
+\title{CUSail: Cornell Autonomous Sailboat Team \\ \textbf{Navigation Team}\\ Spring 2024 Report}
+\author{
+\\ Ridhwan Ahmed, Electrical and Computer Engineering 2026, 3 credits
+\\ Alex Eagan, Mechanical Engineering 2024, 0 credits
+\\ Grace Wang, Computer Science 2024, 3 credits
+\\ Michael Sanders, Computer Science 2026, 1 credit
+\\ Anna Zweck-Bronner, Computer Science 2026, 1 credit
+\\ Fiona Zheng, Computer Science, 3 credits
+\\ Albert Sun, Electrical and Computer Engineering 2026, 3 credits
+\\ Ashley Liu, Computer Science 2026, 3 credits
+\\ Christopher Cheng, Computer Science, 3 credits
+\\ Abhi Vetukuri, Computer Science, 3 credits
+\\ Sean Zhang, Computer Science 2026, 1 credit
+\\ Emith Uyanwatte, Electrical and Computer Engineering, 3 credits
+\\ Will Li, Mathematics 2027, 3 credits
+\\ Maisie Yan, Computer Science 2027, 3 credits
+\\ Nikil Shyamsunder, Computer Science 2027, 1 credit
+\\ Tony Mao, Computer Science and ECE 2026, 3 credits
+\\ Wang Mak, Electrical and Computer Engineering 2027, 2 credits
+\\ Linnea Furlan, Electrical and Computer Engineering 2027, 1 credit
+}
+
+%_______________ABSTRACT_______________________________________
+\begin{document}
+\maketitle
+\clearpage
+\begin{changemargin}{1.5cm}{1.5cm} 
+
+\begin{abstract}
+CUSail's navigation systems allow our boat to sail both autonomously and remotely from one target location (waypoint) to another. A combination of sensors and an autonomous navigation algorithm determines the most optimized set of sailing maneuvers for our sailboat to reach its destination. The sensor array comprises
+of a Global Positioning System (GPS) sensor, an Inertial Measurement Unit (IMU) to calculate boat direction, and a wind sensor capable of measuring wind direction and speed. The implementation of an AirMar system to replace these sensors is currently being experimented with. A long-range radio communication system allows for remote control and robust telemetry. The navigation algorithm operates by first, determining the waypoint to sail to and then finding the optimal heading to sail in. Then, by taking into account data given by the sensor array, the algorithm determines appropriate mainsail and tail sail angles to execute those maneuvers. A PyCam along with computer vision algorithms assist the sailboat in determining the locations of buoys and other vessels on the water. A novel sailing algorithm is being trained using neural network in a ROS (Robotic Operating System) and Gazebo autonomous vehicle simulator. 
+
+\end{abstract}
+\clearpage
+\tableofcontents
+\end{changemargin}
+\newpage
+
+\twocolumn
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% ----------------------------------------------------------------
+% ------------------------------ INTRODUCTION --------------------
+% ----------------------------------------------------------------
+\section{Introduction}
+This semester, the main focus for the electrical components consisted of improving our current remote control system, integrating a new sensor system (AirMar), and exploring the potential usages for the Nvidia Jetson. For the software components, the two primary goals were to implement the new autonomous sailing algorithm as well as refactor and improve the existing event algorithms. 
+
+\section{Sailing Algorithm}
+
+(Anna Zweck-Bronner, Will Li, Grace Wang)
+\subsection{Overview}
+This semester, the main goal was to fully implement and test the new sailing algorithm we researched last semester. During the design and implementation process, new methods of calculating and finding optimal sail and rudder angles that were more efficient and easy to understand at a higher level were discovered and implemented. These implementations and improvements are described in the following subsections. 
+
+\subsection{Tacking}
+This part mainly deals with the situation when the boat is in no-go zone, i.e. when the route to the destination has a ±30 degree angle against the wind. In this case, the boat cannot sail directly to the wind because the wind is directly blowing against the boat if we want to sail straightly to the destination. To ensure that the boat can still make progress to the destination, we have created a method called calculateTP in basic algo that returns the position of a tacking point as a temporary destination the boat will sail to, and this tacking point is calculated and selected such that it is out of the no-go zone. 
+
+How it works is that this method first checks the angle between the boat and the wind so that it knows if the boat is in the no-go zone. When the method finds that the boat is in no-go zone, it will perform the following actions. First, it will calculate the x and y distance from the current location to the final destination as measured in a Cartesian coordinate system. Next, it uses trigonometric identity to calculate the closest tacking point that the boat can go to before going to the destination. Finally, this method will return the tacking point as a tuple so that we can use this information to set the coordinates of the tacking point as the final destination during tacking.
+
+
+\subsection{Sail Position}
+The sail is responsible for the boat's speed. We designed a function to change the position of the sail, which has the mechanical ability to move 90 degrees left and right.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=3.5in]{Photos/points-of-sail.jpg}
+    \caption{Diagram of sail positions according to wind and heading direction}
+    \label{fig: Photos/electrical_blockRS422.png}
+\end{figure}
+
+The function controlling the sail position attempts to mimic basic sail diagrams that show sail positions according to wind direction and desired boat direction. For our algorithm, the boat's current heading direction is always set to 0°. A negative sail angle indicates that the sail is turned to the left, while a positive sail angle indicates that the sail is turned to the right.
+
+We formulated equations for different wind direction thresholds to calculate and return the optimal sailing angle for the boat's current heading direction based on the diagram above. The equations are described below with wind direction denoted as windDir:
+
+\begin{enumerate}
+\item windDir$<0$ or windDir $> 350: 90$
+\item $210<$ windDir $<350: (7/15) \times$ windDir$-80 $
+\item $10 <$ windDir $< 150: (7/15) \times$ windDir$- 88 $
+\end{enumerate}
+
+If the wind is in any other direction, then the boat must be in the no-go zone, where no sailing is possible. In this condition, the function returns an angle of 0 degrees. After obtaining a value, the function ultimately returns the sail angle rounded to a multiple of 5.
+
+\subsection{Rudder Position}
+The rudder is the component responsible for turning the boat. To determine the angle to set the rudder to, several factors need to be taken into account. 
+
+The proposed method takes in the current location, a tacking parameter that indicates whether the boat is tacking or not, a coordinate that represents the tacking point (for when it is tacking), the boat's heading direction, and the destination. 
+
+The first step in the calculation involves determining the target bearing, which is the direction from the current location to the desired destination or tacking point. This is achieved by calculating the x-distance and y-distance between the current location and the target point, and then using the arctangent function to compute the bearing in degrees.
+
+The rudder angle is then calculated by subtracting the target bearing from the current heading direction, taking into account the periodic nature of angular measurements. This difference represents the deviation from the desired course. The final rudder angle is then calculated as a proportion of the deviation, with a scaling factor of 30. This value is then adjusted to the nearest multiple of 5 degrees using a flooring operation.
+
+The proposed method was implemented in a Python environment using the NumPy library for numerical computations. The algorithm was tested with various input scenarios, and the results demonstrated the effectiveness of the approach in calculating the optimal rudder angle for autonomous navigation.
+
+\section{AirMar Integration}
+(Sean Zhang, Ridhwan Ahmed)
+\subsection{Overview}
+Last semester, the implementation of an NMEA-2000 network was proven to work as AirMar serial outputs were observed on a Raspberry Pi. Efforts this semester were focused on integrating the NMEA-2000 network within the larger boat electronics architecture and writing the firmware that processes AirMar sensor outputs into a format useful for the navigation algorithm.
+\subsection{Integration w/ Boat Electronics}
+While the standalone NMEA-2000 network consisting of a single power tap and a T-connector interfacing with the AirMar, Maretron, and a power supply was implemented, we needed to integrate the NMEA-2000 network with the Raspberry Pi and peripherals. Connecting sensor outputs from the AirMar to the Raspberry Pi was trivial due to the Maretron's USB-A output. The more difficult challenge arose from supplying power to the AirMar and the Raspberry Pi via one battery. Luckily, the plug-and-play nature of power taps allowed us to attach an additional power tap to create another interface for a V+ and ground connection.  
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=3.5in]{Photos/boat_electronics.png}
+    \caption{Block diagram of boat electronics with integrated NMEA-2000 network}
+    \label{fig: Photos/electrical_blockRS422.png}
+\end{figure}
+
+\subsection{AirMar Firmware}
+The Maretron converts the NMEA-2000 sentences to USB output which can be read from a serial port on the Raspberry Pi. The AirMar continuously outputs sentences, so the port should continuously be read to capture the current boat state. To prevent the navigation algorithm from blocking while reading sentences, two threads were created:
+\begin{enumerate}
+\item Running the navigation algorithm
+\item Reading the AirMar serial outputs
+\end{enumerate}
+Thread two is created during the AirMar sensor object initialization. As thread two runs, a shared dictionary is updated that houses a mapping of the boat's heading and location. When thread one requires a sensor reading, the dictionary is polled. To ensure no concurrency issues arise where thread one tries to read a sensor reading that is being written, locks were used to ensure reading and writing to the dictionary happened independently. 
+
+\subsection{Project Timeline}
+
+\begin{table}[htp]
+\begin{tabular}{l|l|lll}
+January        & Battery-NMEA-Pi Integration         &  &  &  \\
+Early February & Firmware Development          &  &  &  \\
+Mid Febuary    & Firmware Testing       &  &  &  \\
+March          & Algorithm Integration         &  &  &  \\
+April          & N/A                           &  &  &  \\
+May            & Debugging Calibration Issues        &  &  & 
+\end{tabular}
+\end{table}
+
+\noindent 
+\subsection{Next Steps}
+    During land testing, some issues arose where the AirMar IMU became uncalibrated. The Maretron purchase came with calibration software for the sensor. This software should be explored to see if the AirMar stays calibrated for longer within the boat. If this does not improve the calibration, some additional avenues such as potential interference should be explored. 
+
+\section{RF Redesign}
+(Albert Sun)
+\subsection{Overview}
+
+One of the problems from the prior competition was that we could not control our boat with a wireless controller. This forced us to tether the controller to the base station. This prevented the driver from being able to clearly see the movement of the boat and the driver could not quickly make adjustments. We are transitioning to a RF system that incorporates our current XBees radio design. This will also allow us to add more RF modules in the future as well as be able to switch out different controllers.
+
+\subsection{XBees Reconfiguration}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/ZigBee-Mesh-Topology.png}
+    \caption{Topology of a ZigBee mesh network}
+    \label{fig:Photos/ZigBee-Mesh-Topology.png}
+\end{figure}
+An issue we have with the current XBee topology is the point-to-point nature of the configuration. This prevents of from adding new modules such as the XBox controller for RC control of the boat. We can add this by utilizing API mode on the XBee modules. In API mode, the XBees can operate in a ‘mesh’. An example mesh can be seen in the above figure. A mesh operates with 3 classes of nodes: A coordinator to form the network. A router to route signals through nodes. An endpoint to receive traffic and request data. Our redesign of the system sets the basestation as the coordinator module, the boat as the endpoint modules and our controller as a router module. This not only allows us to communicate with 3 XBee modules on the network but extends our range through a router. We also have a separate network operating on the 2.4GHz frequency. This separate network is connected to the serial console port of the Raspberry Pi. This will allow us to open a terminal on the Raspberry Pi untethered making it easy to run the algorithm. This is run on a separate frequency to prevent noise.
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/xbee network.png}
+    \caption{Topology of our XBee network}
+    \label{Photos/fig:xbee network.png}
+\end{figure}
+
+
+\noindent We communicate via the UART protocol between all of the XBees. The 900MHz frequency is operated by 3 XBee Pro 900HP modules and the 2.4GHz frequency is operated by 2 XBee 3 Zigbee 3 modules. The basestation is connected to a Yagi Antenna. While we have not range tested, the XBee 900HP lists a range of up to 4 miles however we would expect variable range over water.
+
+\subsection{Antenna Integration}
+\noindent While the 2.4GHz radio modules come with built in antennas, the 900MHz modules do not. The Xbee Pro 900HP have RP-SMA antenna connectors soldered onboard which we can use to integrate antennas. For the basestation XBee, we use a Wilson Yagi 700-900MHz antenna. This advertises a gain of 8.8dB when running at 900MHz which is more than enough for our range. Onboard the boat and the controller, we are connected to simple rubber ducky antennas. These have around 3dB of gain however is enough for our purposes.
+
+\subsection{Project Timeline}
+
+\begin{table}[htp]
+\begin{tabular}{l|l|lll}
+January  & XBee Configuration Setup         &  &  &  \\
+February & Raspberry Pi Integration         &  &  &  \\
+March    & Testing and Nav-Algo Integration &  &  &  \\
+April    & Antenna Integration              &  &  &  \\
+May      & Algorithm Integration and Debug  &  &  & 
+\end{tabular}
+\end{table}
+
+\noindent This project was mainly worked on during workshop hours with several sessions outside of workshop debugging integration issues. This totaled to around 5 hours a week of project work.
+
+
+\subsection{Standing Issues and Future Steps}
+One of the main issues we have is we are unable to open serial console on the Raspberry Pi. This may be due to a faulty connection on the PCB which we would have to manually wire serial onto the Raspberry Pi to test. In addition, it may be worthwile to range test over the lake using the 900MHz XBee modules to validate ranges. For future projects, it may be worthwile to explore using LoRa protocol devices as they offer more simplicity than ZigBee. In addition, they are more suited to range and low data rate communication which we are interested in. Another possible project could be looking into SATCOM for longer range voyages for our boat.
+
+\newline
+
+\section{Controller Redesign}
+(Emith Uyanwatte)
+\subsection{Overview}
+
+For manual control of the boat, an Xbox 360 controller is used on the satellite boat chasing the sailboat itself. This differs from past years when the controller was plugged into the basestation directly; this change should allow for more instantaneous control by making it so that only one person is needed to both assess boat angles and actually control the boat. Manual mode must be enabled on the basestation before inputs are interpreted. In order to communicate with the boat, controller inputs are inputted into a Raspberry Pi Zero, and outputted to an Xbee. The Xbee communicates with the boat directly; the boat then sends angles to the basestation to update the GUI. The whole system is powered by a portable battery bank, and is designed to require as little user input as possible. A USB hub is plugged into the Pi Zero; assuming all components of the system are connected before the battery, the system should power on and the controller should automatically connect to the basestation. The first half of the semester was spent primarily on figuring out how the Xbee network should work, while the second half was spent more concretely on implementing the controller system itself. 
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/controller.png}
+    \caption{Topology of the controller setup. Dashed lines indicate Xbee connection, solid lines indicate USB connection. Red lines indicates that it's connection determines if the system is on/off.}
+    \label{Photos/fig:controller.png}
+\end{figure}
+
+\subsection{Pi Zero Setup}
+The Pi Zero is configured with a Python script which automatically runs immediately after its bootup sequence, using the systemd sequence. The code contains a try-except loop to continuously attempt to connect to other nodes of the Xbee network until successful - because of this, the system can be left powered on independently of the status of other nodes. The code also has a try-except loop in the event that the Xbee isn’t plugged in, though this hasn’t been rigorously tested and thus the Xbee should be plugged in before powering on to prevent unexpected issues. Furthermore, no safeguards exist for the controller, and thus it must be plugged in before powering on the Pi Zero.
+
+In the event that controller code on the Pi Zero must be modified, the Pi Zero can operate in desktop mode with a monitor, keyboard, and mouse. The following \href{https://www.thedigitalpictureframe.com/ultimate-guide-systemd-autostart-scripts-raspberry-pi/}{guide} presents a good overview of how to modify the systemd sequence, including checking the status of currently running scripts and modifying the bootup script. The name of the service is control, the username of the Pi is controller, and the password of the Pi is sailboat. 
+
+\subsection{Troubleshooting}
+Two common issues exist with this system: controller failure and the inability to connect to other nodes. For controller failure, if pressing and holding the 'Xbox' button shows a light blinking only once, the joints inside the controller should be re-soldiered. For connection to other nodes, an inability to connect to other nodes can be detected by looking at the TX and RX LEDs on the Xbee - if they both periodically flash but the controller is not sending signals, this means that the Xbee is trying to send and receive a message but is failing to do so. The Xbee configurations on both the controller and basestation should be checked, as well as if proper line of sight is being made between the boat and Xbee. 
+
+\subsection{Future Steps}
+Four future steps could be made to improve on the convenience and utility of the system. Firstly, a wireless Xbox 360 controller could remove the physical tether between the controller and the USB hub, making the system more portable. Secondly, enabling USB gadget mode on the Pi Zero would allow one to access the Pi terminal on any laptop/desktop simply by connecting the two through USB, reducing the work needed to debug by not requiring an external monitor. Third, testing Xbee and implementing controller hot-swapability on the Python script would make adding and removing components very simple. Finally, making a proper housing, say a 3D-printed box, and adding a power switch would make the system more elegant to use.
+
+\section{Simulator Progress}
+(Michael Sanders)
+\newline
+\subsection{Overview}
+The simulator is a tool that allows us to visualize the movement of the boat as it navigates to different waypoints. The simulator also lets us model a body of water with waves and wind. We can test our existing sailing algorithm with the simulator, and train a new sailing algorithm using reinforcement learning. Another benefit of using the simulator is that it allows to test our existing sailing algorithm when weather conditions are not favorable or we cannot prepare our boat for lake testing. The simulator also uses a model of the boat, created through Meshlab. This semester, we worked on further familiarizing ourselves with the simulator and model used.
+\subsection{Past Work}
+At the beginning of this semester, our goal was to learn more about the simulator, as the team was not well-informed about how to best utilize the simulator. The team's previous work on the simulator involved setting up the simulator, which was a very complex task considering the size and scale of the project, to a point where the training could be run successfully. However, we found that we were left with gaps in knowledge, such as not knowing how many different combinations of wind and water parameters to train the model on, how to create a new boat model, and when to stop the training for a particular combination of parameters. Our goal for this semester was to make further progress on these areas of improvement. 
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/simulator.png}
+    \caption{Sailing algorithm running on the precision navigation environment on our simulator}
+    \label{Photos/fig:simulator.png}
+\end{figure}
+\subsection{Implementation}
+Building upon last semester's efforts to save the model, I encountered the issue that every time we finished a training session and terminated the simulator, the training progress seemed to be lost when restarting the simulator. Specifically, we found that after training the simulator to a point where the boat would essentially sail directly to the waypoint, the boat would take a significantly longer and more indirect path to the waypoint at the start of a new training session.
+\indent In addition to the challenges faced with training our sailing algorithm, a significant portion of our efforts was dedicated to understanding and modifying the current boat model. After observing key elements of the current boat, we then used Meshlab to start building the new model, through using different elements in Meshlab to modify the existing model. In addition to the challenges faced with training the model, a significant portion of our efforts was dedicated to understanding and modifying the current boat model. Initially, I faced challenges working with MeshLab due to my lack of experience and the complex nature of the model. However, this difficulty became an opportunity to learn more about areas I had not previously had the chance to explore. 
+
+\section{Event Algorithms}
+(Maisie Yan, Nikil Shyamsunder)
+\newline
+\subsection{Overview}
+In previous semesters, the event algorithms and their helper methods were scattered throughout various files in the code base. This semester, the team decided to refactor and reorganize the event algorithms, create unit tests, and run the events on the raspberry pi in time for lake testing.  
+
+\subsection{Previous Organization}
+The original structure of the codebase presented significant challenges in terms of maintainability and efficiency. Helpers for a given event were often scattered across 6 to 8 different files, complicating the development and debugging processes. This dispersion of related methods across multiple files made it difficult to trace the flow of data and logic through the code. Additionally, wasteful imports were a common issue; entire files were imported when only specific methods were needed. Such practices not only bloated the codebase, but also complicated the dependency management, making the system more fragile and harder to test.
+
+Furthermore, the existence of duplicate methods and even entire files in different parts of the codebase added to the confusion. This  posed a high risk of inconsistencies, as updates to one part of the code might not be reflected in its duplicates. It was also often unclear which helper method belonged to which event. The lack of a coherent organizational structure hindered the team's ability to efficiently manage and update the code, prompting the need for a thorough restructuring to enhance clarity and efficiency.
+
+\subsection{Refactored Codebase Organization}
+In order to refactor the code base, separate modules were created for each event, grouping helper methods under their respective events. Each module contained a file for the main execution of the event, and separate files with the helper methods that were used. This step required a lot of troubleshooting and reorganizing of the import statements and method calls. 
+
+In the original codebase organization, the driver methods for each of the events were integrated directly within the Navigation Controller class. This integration allowed these methods to access important fields of the Navigation Controller directly, such as waypoint coordinates and boat location, which were essential for passing to helper methods. With the refactoring, these driver methods were transitioned out of the Navigation Controller and into their respective event modules. Now, when the Navigation Controller needs to invoke an event’s driver method, it passes itself as an argument. The driver method then extracts the necessary data, such as boat location or waypoints, directly from the passed object, reducing the tight coupling of before and introducing a seperation of concerns. 
+
+\subsection{Testing}
+The refactoring of the event algorithms necessitated a robust approach to testing to ensure functionality and reliability. For each event algorithm, unit tests were developed and housed in separate files, aligning with the modular structure of the codebase. The primary method of each algorithm serves as a driver, facilitating interaction between the helper methods and the navigation controller. Consequently, the testing focused on the event helper methods which are crucial for the computational logic.
+
+Each event helper method receives a set of buoys from the navigation controller and generates a corresponding set of waypoints. The tests were designed to validate that, for any given buoy configuration, the output waypoints matched expected outcomes. This involved defining clear expectations for each test case, which proved to be a significant challenge due to the absence of explicit specifications for what constituted "correct" results.
+
+To address this, time was spent analyzing historical navigation reports and examining legacy code to deduce the intended functionality of each algorithm. This reverse-engineering process enabled us to establish a series of bespoke specifications against which the new unit tests could be assessed. While this approach was initially applied primarily to the station-keeping event, this must be done to other event algorithms in subsequent semesters of the project.
+
+\subsection{Future Steps}
+Future steps for this project include writing unit tests for the endurance, search, and precision navigation events. Additionally, the event algorithms themselves could be optimized and rewritten, specifically with the "keep" portion of the station keeping algorithm. 
+
+\section{Collision Avoidance Algo}
+(Tony Mao, Fiona Zheng)
+
+\subsection{Overview}
+The team worked on developing the collision avoidance algorithm to handle more robust boat detection as well as better collision avoidance mechanisms. The collision avoidance event consists of traversing from between two buoys (start line) to another buoy, and then traversing back to the start. While traversing, there will be an attempted collision with a manned boat, in which the team's sailboat will attempt to avoid using the collision avoidance algorithm. Previously, this algorithm was extremely complicated and did not function well.
+
+\subsection{Design Changes}
+The team's first step was to improve the boat detection algorithm. This was previously done using code similar to the buoy detection, where essentially it would detect the color of the buoy and determine if it fit the criteria. However, this code did not work as well with boats as the team could not determine the color of the boat beforehand. As a solution, CUSail decided to utilize Yolov8 in order to detect boats of all shapes and sizes. 
+
+The algorithm was altered as well in order to handle the utilization of the new boat detection algorithm. Previously, following a boat detection, the boat would drift off to a set direction and continue that way for a predetermined amount of time. The updated algorithm turns ninety degrees towards the direction that the boat is coming from (either right or left) in an attempt to avoid the collision. This direction would continue until the boat is no longer detected. Following this, the boat would attempt to traverse back to its original destination.
+
+\subsection{Future Steps}
+Some things that could certainly be improved would be the integration of the detection algorithm into the navigation system. Additionally, the algorithm was not tested thoroughly on the Pi, which is something that definitely needs to happen in the future. CUSail could also attempt to recreate this test in a future lake test, so we can see in real time the boat attempt to avoid a collision in preparation for the competition. Furthermore, the behavior of the boat when it detects a collision could be more advanced, as currently it is simple but well-defined behavior. 
+
+\section{Onboarding Projects}
+(Wang Mak, Linnea Furlan)
+\subsection{Onboarding Project 1: Robot Hand}
+The onboarding project this semester was creating a 3D-printed hand, which was meant to imitate of the movement of a person's hand. The hand was bound together by fishing lines, through the holes in the fingers and palm. The fishing lines kept the fingers upright and allowed for the bending of the fingers by pulling on them. The fishing line was then connected to servos, which would move upon receiving input pulling on it and bending the finger. Input came from a flex sensor, which would sense the amount of bending applied. Interfacing with an Arduino, the servo was able to move a certain distance depending on the bend on the flex sensor. The onboarding project served as an opportunity to familiarize new members with the available equipment, work in a collaborative environment, and learn to adapt while working on a problem.
+
+Further improvements to the hand would be using a different wire and more firmly securing the flex sensor onto the glove. Using a thicker wire to connect the hands and placing something between the phalanges such as a bead would allow the hand to bend smoother. The fishing line used was difficult to work with as they were transparent, and frequently would get pulled through the holes due to how thin it was. In addition, the lack of space between the phalanges meant that there were times when the fingers got stuck and unable to bend. Placing something between them would resolve this so that the hand would bend more consistently. Another improvement would be to sew the flex sensor onto the glove, using tape was not effective as there were times when the flex sensor would read the force placed onto it by the tape and bend without our input. It would also move around so that when someone's fingers were bent the flex sensor did not move along with it.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/hand.jpg}
+    \caption{Photo of the setup, flex sensor attached to glove connected to servos controlled by Arduino}
+    \label{Photos/fig:hand.jpg}
+\end{figure}
+\newpage
+% \input{Content}
+
+
+% \begin{bibunit}[plain]
+% \section{References}
+
+% \putbib[References]
+% \end{bibunit}
+
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{navref}
+%below
+% \input{Report & LATEX}
+\end{document}

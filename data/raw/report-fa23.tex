@@ -1,0 +1,316 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{bibunits}
+
+% Set page size and margins
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=1.5cm,right=1.5cm,marginparwidth=1.5cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{multicol}
+\def\changemargin#1#2{\list{}{\rightmargin#2\leftmargin#1}\item[]}
+\let\endchangemargin=\endlist 
+\usepackage{stfloats} 
+
+%Setting up Section Font and Size
+\usepackage{titlesec}
+\usepackage[font=footnotesize,labelfont=bf]{caption}
+\titleformat{\section}    
+       {\normalfont\fontsize{18}{19}\sffamily\bfseries}
+       {\thesection}
+       {1em}
+       {}
+\titleformat{\subsection}    
+       {\normalfont\fontsize{11}{19}\slshape\bfseries}
+       {\thesubsection}
+       {1em}
+       {}
+\titleformat{\subsubsection}    
+       {\normalfont\fontsize{11}{19}\slshape\bfseries}
+       {\thesubsubsection}
+       {1em}
+       {}
+%Setting up Section Spacing 
+\titlespacing\section{0pt}{10pt plus 4pt minus 2pt}{10pt plus 2pt minus 2pt}
+\titlespacing\subsection{0pt}{12pt plus 4pt minus 2pt}{0pt plus 2pt minus 2pt}
+\titlespacing\subsubsection{0pt}{5pt plus 4pt minus 2pt}{0pt plus 2pt minus 2pt}
+
+%Headers
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhead[L]{Cornell Autonomous Sailboat Team}
+\fancyhead[R]{Navigation Team     
+    \includegraphics[width=0.30in]{Photos/LOGO_BLACK.png}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%_____________Title + Authors___________________________________
+
+%Title 
+\title{CUSail: Cornell Autonomous Sailboat Team \\ \textbf{Navigation Team}\\ Fall 2023 Report}
+\author{
+\\ Alex Eagan, Mechanical Engineering 2024, 0 credits
+\\ Grace Wang, Computer Science 2024, 3 credits
+\\ Michael Sanders, Computer Science 2026, 3 credits
+\\ Anna Zweck-Bronner, Computer Science 2026, 3 credits
+\\ Fiona Zheng, Computer Science, 3 credits
+\\ Albert Sun, Electrical and Computer Engineering 2026, 3 credits
+\\ Ashley Liu, Computer Science 2026, 3 credits
+\\ Christopher Cheng, Computer Science, 3 credits
+\\ Abhi Vetukuri, Computer Science, 3 credits
+\\ Sean Zhang, Computer Science 2026, 1 credit
+\\ Emith Uyanwatte, Electrical and Computer Engineering 2026, 1 credit
+\\ Will Li, Computer Science 2027, 0 credits
+\\ Maisie Yan, Computer Science 2027, 0 credits
+\\ Nikil Shyamsunder, Computer Science 2027, 0 credits
+}
+
+%_______________ABSTRACT_______________________________________
+\begin{document}
+\maketitle
+\clearpage
+\begin{changemargin}{1.5cm}{1.5cm} 
+
+\begin{abstract}
+CUSail's navigation systems allow our boat to sail both autonomously and remotely from one target location (waypoint) to another. A combination of sensors and an autonomous navigation algorithm determines the most optimized set of sailing maneuvers for our sailboat to reach its destination. The sensor array comprises
+of a Global Positioning System (GPS) sensor, an Inertial Measurement Unit (IMU) to calculate boat direction, and a wind sensor capable of measuring wind direction and speed. The implementation of an AirMar system to replace these sensors is currently being experimented with. A long-range radio communication system allows for remote control and robust telemetry. The navigation algorithm operates by first, determining the waypoint to sail to and then finding the optimal heading to sail in. Then, by taking into account data given by the sensor array, the algorithm determines appropriate mainsail and tail sail angles to execute those maneuvers. A PyCam along with computer vision algorithms assist the sailboat in determining the locations of buoys and other vessels on the water. The sailing algorithm is being trained using neural network in a ROS (Robotic Operating System) and Gazebo autonomous vehicle simulator. 
+
+\end{abstract}
+\clearpage
+\tableofcontents
+\end{changemargin}
+\newpage
+
+\twocolumn
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% ----------------------------------------------------------------
+% ------------------------------ INTRODUCTION --------------------
+% ----------------------------------------------------------------
+\section{Introduction}
+This semester, the main focus for the electrical components consisted of improving our current remote control system, integrating a new sensor system (AirMar), and exploring the potential usages for the Nvidia Jetson. For the software components, the primary goal was to implement a new autonomous sailing algorithm to improve our existing simulator and further train our neural net to perform autonomous sailing for our new boat model. 
+
+\section{Sailing Algorithm}
+(Ashley Liu, Michael Sanders, Grace Wang, Fiona Zheng, Anna Zweck-Bronner)
+\subsection{Overview}
+Since the sailing algorithm from last year did not function as well as expected, the team decided to conduct sailing research and reorganize the resources from last year in order to create a new sailing algorithm. The team began by performing a literature review of research papers detailing different approaches to developing the sailing algorithm. Following the literature review, the team compiled the new information and designed a new algorithm.  
+\subsection{System Organization}
+The group designed a rough draft for a navigational systems diagram based on the previous program organization, \href{https://my.ece.utah.edu/~kstevens/4710/reports/autonomous-sailing.pdf}{Autonomous Sailing Across the Great Lake (Kyle Lemmon et. al)} \cite{utah}, and \href{https://core.ac.uk/download/pdf/228200594.pdf}{Autonomous Sailboat Navigation—Novel Algorithms and Experimental Demonstration (Roland Stelzer)} \cite{uk}. The general algorithm takes into account waypoint inputs, a coordinate field, sensor inputs, and other detected external factors. The diagram displays a flow of operations for the autonomous sailboat to complete in order to navigate from an initial waypoint to a final waypoint.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{Screen Shot 2023-12-10 at 2.46.55 PM.png}
+    \caption{Diagram of Navigational System}
+    \label{fig:enter-label}
+\end{figure}
+\subsection{Line Following Algorithm}
+Through using concepts from \href{https://ieeexplore.ieee.org/document/9999358}{Experimental Studies of Autonomous Sailing With a Radio Controlled Sailboat (Augustin Morge et. al)}  \cite{rcsailboatieee}, we were able to implement a line-following algorithm that generated a sailing angle, rudder angle, and tacking variable to enable the sailboat to pathfind to a destination. This was an algorithm involving 7 steps:
+
+\begin{enumerate}
+    \item Calculate the algebraic distance between the sailboat and the line being followed. If the output, also known as \( e \), is greater than 0, the sailboat is on the left of the line, and if the output is less than 0, the sailboat is on the right of the line. 
+    \[e = \text{det}\left(\frac{b - a}{||b - a||}, m - a\right)\]
+    {\tiny Equation 1: Calculating cross track error, \( e \), using the determinant of a matrix. This is the shortest distance between the boat at point \( m \) and the line formed between points \( a \) and \( b \).}
+
+    \item Update the tacking variable \( q \), as the sailboat is only allowed to change its tacking when the absolute value of \( e \) is greater than \( r \), which is the cutting distance to the line.
+    \[ \text{if} \ |e| > r \ \text{then} \ q = \text{sign}(e) \]
+    {\tiny Equation 2: The tacking variable \( q \) is updated based on the sign of \( e \) when the absolute value of \( e \) exceeds the threshold \( r \).}
+
+    \item Calculate the line angle \( \tau \) which is the orientation angle of the line segment from \( a \) to \( b \).
+    \[\tau = \text{angle}(b - a)\]
+    {\tiny Equation 3: Computing the angle \( \tau \) of the desired course from point \( a \) to \( b \).}
+
+    \item Calculate the desired heading \( \hat{\theta} \) by adjusting the line angle \( \tau \) with the arc tangent of the cross-track error over the distance \( r \).
+    \[\hat{\theta} = \tau - \arctan\left(\frac{e}{r}\right)\]
+    {\tiny Equation 4: Adjusting the desired course angle \( \hat{\theta} \) by accounting for the cross-track error \( e \).}
+
+    \item Update the desired heading to be close-hauled when in the \textit{no-go zone} based on the true wind direction.
+    \[ \text{if} \ \left(\cos(\psi_{tw} - \hat{\theta}) + \cos(\xi)\right) < 0 \]
+    \[ \text{or} \ \left(\left(|e| - r\right) \ \text{and} \ \left(\cos(\psi_{tw} - \tau) + \cos(\xi)\right) < 0\right) \]
+    {\tiny Equation 5: The desired heading \( \hat{\theta} \) is corrected to maintain a close-hauled course in adverse wind conditions.}
+
+    \item Update the rudder angle \( \delta_r \) based on the desired heading.
+    \[\delta_r = \frac{\delta_r^{max}}{\pi} \cdot \text{sawtooth}(\theta - \hat{\theta})\]
+    {\tiny Equation 6: Calculating the rudder angle \( \delta_r \) using a sawtooth function to keep the sailboat on the desired heading \( \hat{\theta} \).}
+
+    \item Update the sail angle \( |\delta_s| \) based on the desired heading.
+    \[|\delta_s| = \frac{\pi}{4} \cdot \left(\cos(\psi_{tw} - \hat{\theta}) + 1\right)^{\frac{\log\left(\frac{\pi}{2\beta}\right)}{\log(2)}}\]
+    {\tiny Equation 7: Adjusting the sail angle \( |\delta_s| \) in relation to the heading and wind direction to optimize sailing efficiency.}
+\end{enumerate}
+\subsection{Next Steps}
+Next semester, the team needs to finish developing the code for the sailing algorithm and begin testing it. Specifically, the team needs to determine a constant k to set the rudder angle proportional to the sail angle. Additionally, adjustments may need to be made to the algorithm based on the physical size of the new sailboat.   
+
+\section{Sensor Integration}
+(Sean Zhang)
+\subsection{Overview}
+In past years, the sensor array consisted of an Inertial Measurement Unit (IMU), a Global Positioning System (GPS) module, and an anemometer. This setup, while functional, encountered several challenges during the competition. For instance, unreliable IMU and GPS readings limited the effectiveness of the autonomous navigation algorithm. The sensor connections to the PCB headers were also unreliable; the connections needed to be re-soldered mid-competition. To address these issues, a more robust and reliable sensor solution should be integrated.
+\subsection{AirMar GH2183}
+The AirMar GH2183 combines IMU and GPS functionality into one housing. The GH2183 boasts best-in-class 1-degree heading accuracy with a 20 Hz update frequency and 10' GPS accuracy with a 1 Hz update frequency. The GH2183 interfaces with the rest of the system via data output in the NMEA 2000. Several options were considered to interface the NMEA 2000 output format with the boat computer. NMEA 2000 output is a standard marine time communication protocol that outputs data in a specific format. Two main approaches were considered:
+\begin{enumerate}
+    \item RS-422 HAT to convert NMEA-2000 output to UART
+    \item NMEA-2000 network w/ NMEA-2000 to USB converter   
+\end{enumerate}
+A high-level block diagram of the 1st option can be seen below. 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=3.25in]{Photos/electrical_block_RS422.png}
+    \caption{Electrical block diagram for RS-422 to UART conversion}
+    \label{fig: Photos/electrical_blockRS422.png}
+\end{figure}
+
+While this option is cheaper compared to setting up an NMEA-200 network, several concerns were raised upon closer inspection of the design. For instance, the design required cutting the GH2183 sensor cable, which would erase the possibility of changing to option two. Furthermore, the untested nature of the RS-422 HAT meant the design was unproven. 
+
+As a result, setting up an NMEA-2000 network was chosen as the more robust solution. The high-level block diagram of this network can be seen below. The NMEA-2000 network is a robust multi-talk/listen communication protocol that is often implemented in maritime systems. The popularity means it is an attractive option for the future-integrating new sensors would only require extending the NMEA-2000 network. For our AirMar GH2183, the network transfers data output messages via the sensor cable and through a Maretron NMEA-2000 to USB converter. This allows us to receive data outputs through the USB interface on the Raspberry Pi. This semester, the network was proven to work as serial outputs were observed. 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=3.25in]{Photos/electrical_block_maretron.png}
+    \caption{Electrical block diagram for NMEA-2000 network and Maretron}
+    \label{fig: Photos/electrical_blockRS422.png}
+\end{figure}
+
+\subsection{Anemometer}
+We are using a Davis Instruments Vantage Pro2 anemometer to measure both wind direction and speed. The anemometer interfaces with the rest of the system with
+4 wires: a ground signal, power signal, wind direction output signal, and wind speed output signal. The wind speed was not used in previous versions of the navigation algorithm. However, to keep options open for the algorithm rewrite, the wind speed capability was re-implemented this semester. 
+The wind cups measure wind speed using the Hall Effect. Magnets arranged in the wind cups create a magnetic field and the embedded Hall Effect sensor measures the strength of this magnetic field. According to the magnetic field strength, pulses are sent via the wind speed output line. The wind speed can then be converted to mph via the following conversion:
+
+\begin{equation}
+V = \frac{2.25P}{T}
+\end{equation}
+
+where V represents the wind speed in mph, P represents the number of pulses measured, and T represents the time interval.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=3.25in]{Photos/anemometer.png}
+    \caption{The Davis Instruments Anemometer Vantage Pro2}
+    \label{fig: Photos/anemometer.png}
+\end{figure}
+
+\subsection{Next Steps}
+For the AirMar GH2183, Once sentence outputs are received on the Pi, a parsing script is needed to correctly process the data into a format accessible by the navigation algorithm. While a parsing script has been written, the script has not been tested. Furthermore, the NMEA-2000 network was powered with a DC power supply. A routing system needs to be designed to route the 12V boat batter to the NMEA-2000 network and 5V to the Raspberry Pi. 
+
+For the anemometer, the sensor firmware needs to be translated from Arduino to Python. The existing anemometer sensor class should be extended with a new read function that polls the pin corresponding to the wind speed. 
+
+Since the AirMar GH2183 renders the previous IMU and GPS redundant and the anemometer wind speed requires an extra digital pin connection, a PCB redesign that removes redundant sensors and routes the extra pin connection is also needed. 
+
+\section{Nvidia Jetson Integration}
+(Emith Uyanwatte)
+\subsection{Overview}
+The Nvidia Jetson line is a set of embedded systems designed for ML inferencing on the edge. At the moment, we are running a Raspberry Pi Model 4B (RPi). As CUSail pushes for more ML-based algorithms, hardware bottlenecks become more of an issue. Nvidia has sent CUSail their AGX Orin Developer Kit - all Jetson units are designed to be easy to transition to from other embedded systems (RPi included). There are currently issues with the transition, but properly implementing a Jetson system onto the boat should reduce hardware-level bottlenecks and raise the ceiling of the autonomous functionality of the boat.
+\subsection{Jetson Hardware and Alternatives}
+ML algorithms benefit significantly from a system's ability to perform many basic operations in parallel - this ability is determined by the hardware of the system. The RPi has four CPU cores and no dedicated GPU cores. This lack of GPU cores significantly hinders it's ability to perform ML operations; given a complex enough algorithm, we would need to place artificial constraints on features of the boat in order for the RPi to keep up.
+\newline
+\indent Three paths were considered for implementing GPU cores - keeping the RPi and giving it a USB AI Accelerator (Google Coral), replacing the RPi with the Jetson AGX Orin, or replacing the RPi with a Jetson unit with a smaller footprint. Each have their own benefits and drawbacks.
+\newline
+\indent Google's Coral AI Accelerator would be the easiest the integrate into the boat - all it requires is a free USB port on the RPi and it has a tiny footprint. That being said, it comes with a slew of limitations which would ultimately hinder the capabilities of the boat artificially, which is the exact scenario this project is seeking to avoid. Google's Coral is excellent for introducing AI to inflexible systems, but our boat is not inflexible in the slightest.
+\newline
+\indent Replacing the RPi with the Jetson AGX Orin would be the cheapest option and give the boat an obscene AI overhead, but should not be considered for multiple reasons. Firstly, The AGX Orin has a very large physical footprint and would require significant work from the Mechanical subteam to be properly integrated. Secondly, putting the AGX Orin on the boat is a major liability. While risk is always taken when deploying electronics out on water, the AGX Orin is very expensive and extremely sensitive to water, leaving us in a very bad spot in the even that we need to replace components. For these reasons, deploying the AGX Orin onto the boat is not the path that should be taken.
+\newline
+\indent The option we eventually settled on was deploying a small footprint Jetson unit onto the boat (Jetson Nano or Jetson Orin Nano). While a final decision on which unit to deploy has not been made yet, both units have a small footprint and are very powerful. Furthermore, we can emulate the integration process of these systems by trying to integrate the AGX Orin we already have in house, allowing us to ensure that these units will work.
+\subsection{RPi Implementation and Transition}
+At the moment, the RPi runs a hard-coded algorithm using sensor inputs it reads from a shield connected to it's GPIO pins. The RPi runs a custom-built OS based off of Debian and has very little custom hardware for interfacing with third party hardware plugged into it.
+\newline
+\indent The Jetson runs a build of Ubuntu (which is also Debian based). Furthermore, it contains the same 40-pin GPIO array as the RPi with the exact same pinout as the RPi, meaning that shields and accessories designed for the Pi should be able to work on the Jetson. At a hardware and software level, the transition from the RPi to the Jetson should not be difficult due to their similarities.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/ShieldonJetson.jpg}
+    \caption{AGX Orin with RPi shield plugged in}
+    \label{fig:Photos/ShieldonJetson.jpg}
+\end{figure}
+\newline
+\indent Assuming that the pinmux on the Jetson is configured correctly by the user, it should be able to pick up digital signals from all of the pins. In order to facilitate analog to digital signal conversion, the RPi Shield contains an Adafruit ADS1x15 module. While libraries interfacing with this module exist for both the Jetson and RPi, they are somewhat different in how they function. As a result, a rewrite of low-level nav algo code is necessary in order for proper sensor readings to be made. Additionally, any variables or libraries used in the code that are exclusive to the RPi need to be replaced.
+
+\subsection{Standing Issues and Future Steps}
+Upon experimentation with our Jetson's GPIO pins, the pins don't seem to be giving any output, nor do they seem to be receiving any input. In order to test this, a circuit with an LED was created, as were multiple Python scripts designed to toggle the pin. When no output was produced, low-level Linux tools were utilized to interface with the pinmux directly. When this was unsuccessful, I contacted Nvidia directly - they were unable to diagnose the issue. At the moment, I believe that our Jetson unit is faulty, and thus the process of transitioning from the RPi to the Jetson has had to pause.
+\newline
+\indent Before making any definitive conclusions on the state of our Jetson unit, I wish to perform a full reflash of the software and remove any software-level variables from affecting GPIO functionality. Assuming this is an issue with our hardware, we would need to consider obtaining a lower-end model Jetson. 
+\newline
+\indent The Jetson Nano and Jetson Orin Nano are different in a plethora of ways, but both aim to be powerful edge inferencing machines with a small overhead. The Orin Nano is far newer, and thus has multiple years of architectural improvements over the Nano. Furthermore, Nano support from Nvidia is set to end in the near future; the same cannot be said about the Orin Nano. However, the Orin Nano is considerably more expensive (\$500 vs. \$150).
+\newline
+\indent In either case, a rewrite of some low-level code is necessary for the Jetson to make proper sensor readings. Furthermore, it is necessary for the team as a whole to learn more about developing ML algorithms, particularly with reference to dedicated ML hardware, for the benefits of transitioning to a Jetson system to be fully realized.
+
+\section{RF Redesign}
+(Albert Sun)
+\subsection{Overview}
+
+One of the problems from the prior competition was that we could not control our boat with a wireless controller. This forced us to tether the controller to the base station. This prevented the driver from being able to clearly see the movement of the boat and the driver could not quickly make adjustments. We are transitioning to a RF system that incorporates our current XBees radio design. This will also allow us to add more RF modules in the future as well as be able to switch out different controllers.
+
+\subsection{XBees Reconfiguration}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/ZigBee-Mesh-Topology.png}
+    \caption{Topology of a ZigBee mesh network}
+    \label{fig:Photos/ZigBee-Mesh-Topology.png}
+\end{figure}
+
+For our RF redesign, we utilize the API mode of the XBees modules. Currently, the XBees operate in AT mode. This is advantageous for simple point-to-point communication as in this mode, the Xbees transmits any serial data it receives to the destination address. In API mode, the XBees can operate in a ‘mesh’. An example mesh can be seen in the above figure. A mesh operates with 3 classes of nodes: A coordinator to form the network. A router to route signals through nodes. An endpoint to receive traffic and request data. The RF redesign currently is a mesh of 3 XBee modules. We configure the XBees to API mode through XCTU. By setting multiple XBee modules in a network into API mode with at least one coordinator, we are able to send and receive data frames rather than basic serial communication. We currently have API mode setup with 2 XBee modules sending frames through XCTU.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/Screenshot 2023-12-02 114047.png}
+    \caption{Topology of our planned XBee network}
+    \label{Photos/fig:Screenshot 2023-12-02 114047.png}
+\end{figure}
+
+
+\noindent In our new network, the coordinator represents the basestation, router represents the controller and endpoint represents the boat. With the new mesh network, the range of our XBees should be extended as signals from the base station can be routed through the controller XBees. A future step would be to test the range over a longer range. The XBee module used for our testing, the DiGi XBee 3 802.15.4 RF Module advertises 4000ft of range in line of sight. In theory, one router would extend our total range to 8000 ft with ideal positioning. A mesh network will also allow us more freedom in the future to add on more wireless modules.
+
+\subsection{Arduino and Controller Integration}
+
+To integrate our mesh network with a wired Xbox controller, we use an Arduino host shield to connect a wired controller to the Arduino. Using the XBee library built into Arduino, we are able to send serial communication from the controller. The XBee will be connected to the Arduino via an XBee explorer module. We will operate the controller with the unicast transmission mode of the XBees. This mode allows for point-to-point communication in a mesh.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/5v_arduino_xbee1.png}
+    \caption{Circuit diagram for Arduino integration with XBee explorer module}
+    \label{Photos/fig:5v_arduino_xbee1.png}
+\end{figure}
+\subsection{Standing Issues and Future Steps}
+ Our next step is to fully configure our mesh network. We must first add a router node and be able to send and receive frames from all 3 nodes. We will do this by testing the network with XCTU. Once validated, we will integrate the Arduino module into the network and setup the Xbox controller to be able to send packets through the mesh. Finally, we will integrate API mode with the boat and basestation rewriting the code to be able to send and receive data packets rather than serial. The main issue as of now is being able to send packets in API mode without relying on XCTU and using an Arduino. We believe that this is due to our misuse of the Arduino XBee library and will resolve this after further testing.
+\newline
+
+\section{Onboarding Projects}
+\subsection {Sailboat GUI}
+(Nikil Shyamsunder, Maisie Yan)
+\newline
+Our onboarding project consisted of creating a GUI in python to simulate the path of our sailboat in competition. This visualizer was intended to demonstrate how the team's precision navigation algorithm works to judges at competition. Conceptually, this required us to understand the waypoint generation algorithm (we focused on the endurance challenge specifically), and incorporate this algorithm into our animation. We also had to design ways to incorporate inputs for buoys and starting, stopping, and resetting the application. We used the PyQt5 library to visualize the GUI. We implemented a simple algorithm to calculate and plot the waypoints needed to create an optimal path around buoys. Additionally, we implemented a real-time sailboat animation to animate the sailboat traversing across the calculated path. 
+
+\subsection{CNN Buoy Detection}
+(Will Li)
+\newline
+In this semester, I have been working on the project to develop a CNN model for buoy detection. This project is based on machine learning and computer vision, and one natural thing that I have done is to learn the basic concepts in these two areas, as I have barely any foundation on these things. By following the guidelines and looking at the resources given by Grace, I was able to learn the basics of image processing, TensorFlow package, and the different stages in machine learning, i.e. training, validation and testing. Especially, I find the YouTube video series made by TensorFlow to be a particularly useful learning resource.
+
+After that, I went online to find a dataset for training the model, and the data I found is on the website https://images.cv/. Even though the dataset only contains buoys and no other objects on the water, it has two main advantages. First, all the buoy images inside this dataset have very small size (only a few kb), which can speed up the training process while retaining the important information. Second, the dataset has already been separated into test, validation, and training sets, which reduces the amount of work that I need in building the CNN model. Thus, I expect to further build on this dataset in the future by adding some non-buoy objects on water. Moreover, I also found an example CNN model built by TensorFlow that can potentially help write my own model. However, I am currently stuck at loading the data into the model, because the example given by TensorFlow only uses the built-in data. I expect that I will continue working on this project in the next semester to finish it. 
+
+\section{Simulator Progress}
+(Christopher Cheng, Abhi Vetukuri)
+\newline
+\subsection{Overview}
+The simulator is a tool that allows us to visualize the movement of the boat as it navigates to different waypoints. The simulator also lets us model a body of water with waves and wind. We can test our existing sailing algorithm with the simulator, and train a new sailing algorithm using reinforcement learning. Another benefit of using the simulator is that it allows to test our existing sailing algorithm when weather conditions are not favorable or we cannot prepare our boat for lake testing. We designed a training environment, validation environment for testing, and a precision navigation environment where we could test our sailing algorithm on the precision navigation course. 
+\subsection{Past Work}
+At the beginning of this semester, our goal was to learn more about the simulator, as the team was not well-informed about how to best utilize the simulator. The team's previous work on the simulator involved setting up the simulator, which was a very complex task considering the size and scale of the project, to a point where the training could be run successfully. However, we found that we were left with gaps in knowledge, such as not knowing how many different combinations of wind and water parameters to train the model on, how to create a new boat model, and when to stop the training for a particular combination of parameters. Our goal for this semester was to make progress on these areas of improvement. 
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=3.25in]{Photos/simulator.png}
+    \caption{Sailing algorithm running on the precision navigation environment on our simulator}
+    \label{Photos/fig:simulator.png}
+\end{figure}
+\subsection{Implementation}
+The first issue that encountered was that every time we finished a training session and terminated the simulator, when we would restart the simulator, it seemed that our training progress would be loss. More specifically, we found that after training the simulator to a point where the boat would essentially sail directly to the waypoint, when opening a new training session, the boat would take a significantly longer and more indirect path to the waypoint. We tried a number of methods to determine the issue, such as taking videos of the boat's performance to compare between training sessions, changing parameters in the code for the training environment, and manually inspecting the files where the boat model was saved. Ultimately, we decided that the model was indeed saving progress between training sessions; however, we still cannot confidently explain why the boat's performance is significantly worse at the beginning of each training session. \\
+\indent Once we determined that the training progress of our model was saving properly, we were able to start domain randomization. Essentially, we want our sailing algorithm to perform well on a variety of different wave and wind combinations so that we are better prepared for competition. The practice of training our boat on these different combinations of parameters is called domain randomization. Changing the wave and wind parameters involves editing the relevant files and recompiling the codebase. 
+\indent In addition to the challenges faced with training our sailing algorithm, a significant portion of our efforts was dedicated to understanding and modifying the current boat model. We discussed with the Mec team to understand the direction they are going with the boat model for this semester. With a rough sketch of the model, we then used Meshlab to build the new model. Leveraging the existing boat model files, we edited them to make the model more like the model we will have this year at competition. It is important to note that we could not construct a completely new boat model for the simulator at this stage, primarily due to the absence of a definitive design. Nonetheless, the modifications we implemented were enough to bring the simulator's boat model closer to what we envision the competition model will be. These efforts in model editing are expected to help the effectiveness of our training sessions on the model in the upcoming semester.
+\newpage
+% \input{Content}
+
+% \begin{bibunit}[plain]
+% \section{References}
+
+% \putbib[References]
+% \end{bibunit}
+
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{navref}
+%below
+% \input{Report & LATEX}
+\end{document}
